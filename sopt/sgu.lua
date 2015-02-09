@@ -28,7 +28,7 @@ function sopt.sgu(func, x, config, state)
 		x:add(state.vel)
 		return x, {fx}
 	elseif mom_type == sopt.nag then
-		if not state.test_loc then
+		if not state.temp then
 			local fx, grad_fx = func(x)
 			state.temp = torch.Tensor():typeAs(x):resizeAs(x):
 				copy(grad_fx):mul(-cur_lr)
