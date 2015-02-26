@@ -47,7 +47,7 @@ decay is desired.
 - `ramp_up_momentum`: Determines whether the momentum should be kept constant or
 ramped up to a given value over several hundred iterations.
 
-
+   
 
 	local lr, mom
 
