@@ -48,6 +48,7 @@ decay is desired.
 ramped up to a given value over several hundred iterations.
 
 
+
 	local lr, mom
 
 	if lr_decay ~= 0 then
