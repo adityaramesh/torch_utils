@@ -104,8 +104,8 @@ details. Ramping up the momentum using the `sutskever_blend` schedule may
 accelerate convergence during the first few epochs.
 
 Both RMSProp and AdaDelta can be fine-tuned in the case the need to do so
-arises. Both of these algorithm accept another parameter called `decay`,
+arises. Both of these algorithms accept another parameter called `decay`,
 sometimes referred to as the "memory size" in the literature. (I think that this
 is a shitty name.) The default value is `0.95`; perhaps changing it to something
-slightly larger or smaller will help. Whatever you do, *do not* change the
+slightly larger or smaller will help. Whatever you do, **do not** change the
 `epsilon` parameter!
