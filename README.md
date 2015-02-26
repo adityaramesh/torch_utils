@@ -89,12 +89,14 @@ learning rate should be. Initially, the batch size should be chosen to be quite
 large (e.g. one). Over time, the batch size should be increased and the learning
 rate decreased. With a batch size of one, a typical value for the learning rate
 is `1e-3` or `1e-4`. With a batch size of about 100, a typical value for the
-learning rate is `0.1` or `0.01`. If learning rate decay is used, the decay
-constant should be relatively small (e.g. `1e-7`). For best results, perform a
-grid search over a small number of training instances (e.g. 200). It is a
-well-known and convenient property of SGU that convergence behavior on a small
-subset of the training sample will be reflected (albeit on a larger time scale)
-when optimization is performed using the full training sample. For more
+learning rate is `0.1` or `0.01`. AdaDelta is an exception to this rule: the
+default initial learning rate is one; when the learning rate is tweaked, it
+should be kept to something close to one. If learning rate decay is used, the
+decay constant should be relatively small (e.g. `1e-7`). For best results,
+perform a grid search over a small number of training instances (e.g. 200). It
+is a well-known and convenient property of SGU that convergence behavior on a
+small subset of the training sample will be reflected (albeit on a larger time
+scale) when optimization is performed using the full training sample. For more
 information, see "Stochastic Gradient Descent Tricks", by Leon Bottou.
 
 The momentum value should be set to at least `0.9`. When performing a grid
