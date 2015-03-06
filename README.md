@@ -86,7 +86,7 @@ the function being minimized and `params` is the current iterate.
 The best value for the learning rate depends on the nature of the problem and
 the chosen batch size. The smaller the batch size, the smaller the chosen
 learning rate should be. Initially, the batch size should be chosen to be quite
-large (e.g. one). Over time, the batch size should be increased and the learning
+small (e.g. one). Over time, the batch size should be increased and the learning
 rate decreased. With a batch size of one, a typical value for the learning rate
 is `1e-3` or `1e-4`. With a batch size of about 100, a typical value for the
 learning rate is `0.1` or `0.01`. AdaDelta is an exception to this rule: the
