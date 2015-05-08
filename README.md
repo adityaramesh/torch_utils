@@ -9,6 +9,21 @@
 
 A collection of utilities for deep learning using Torch.
 
+## model_utils.lua
+
+Adds support for saving and restoring the model and training state. The
+following information is saved:
+
+- The current model and training state (e.g. the current epoch, the state of the
+optimization algorithm, etc.).
+- The model and training state that achieved the best training error.
+- The model and training state that achieved the best validation error.
+- The training scores.
+- The validation scores.
+
+A backup mechanism is used to ensure that data corruption does not occur if the
+program is terminated while writing to disk.
+
 ## sopt
 
 A small library for stochastic optimization that implements the following
@@ -20,23 +35,14 @@ algorithms:
 
 The implementation of SGU is more generic than the implementation of SGD found
 in the Torch `optim` package. This one allows the learning rate and momentum
-annealing schedules to be arbitrary lambdas. Several [predefined
+annealing schedules to be arbitrary functions. Several [predefined
 schedules](sopt/schedule.lua) are available.
 
-## Usage
+# Usage
 
-If `torch_utilities` is not already in a path accessible to the Torch
-interpreter, then you can add its location to the package path by doing the
-following:
+## sopt
 
-	package.path = package.path .. ';<path to torch_utilities>/?.lua'
-
-In the code above, `<path to torch_utilities>` should be replaced with the path
-to the `torch_utilities` directory.
-
-### sopt
-
-To import `sopt`, use `require 'sopt'`. The code below demonstrates how to set
+To import `sopt`, use `require "sopt"`. The code below demonstrates how to set
 up an optimization algorithm. Assume that the following variables are defined:
 
 - `opt_method`: The selected optimization method.
