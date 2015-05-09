@@ -209,8 +209,6 @@ local function deserialize(opt, mpaths, model_info_func, train_info_func)
 	else
 		print("Initializing accuracy info.")
 		acc_info = {
-			best_train = 1e10,
-			best_test = 1e10,
 			train_scores = {},
 			test_scores = {}
 		}
@@ -241,11 +239,11 @@ function model_utils.save_train_progress(func, epoch, new_score, mpaths, info)
 	torch.save(mpaths.cur_model_fn, info.model)
 	torch.save(mpaths.cur_train_info_fn, info.train)
 
-	if func(new_score, info.acc.best_train) then
+	if info.acc.best_train == nil or func(new_score, info.acc.best_train) then
 		info.acc.best_train = new_score
 		info.acc.train_scores[epoch] = new_score
 
-		print("New best train perplexity: updating hard links.")
+		print("New best train score: updating hard links.")
 		rename_file_if_exists(mpaths.best_train_model_fn,
 			mpaths.best_train_model_backup_fn, true)
 		rename_file_if_exists(mpaths.best_train_train_info_fn,
@@ -272,28 +270,28 @@ function model_utils.save_train_progress(func, epoch, new_score, mpaths, info)
 	remove_file_if_exists(mpaths.cur_train_info_backup_fn, true)
 end
 
-function model_utils.save_test_progress(func, epoch, new_score, paths, info)
-	if func(new_score, info.acc.best_test) then
+function model_utils.save_test_progress(func, epoch, new_score, mpaths, info)
+	if info.acc.best_test == nil or func(new_score, info.acc.best_test) then
 		info.acc.best_test = new_score
 		info.acc.test_scores[epoch] = new_score
 
-		print("New best test perplexity: updating hard links.")
-		rename_file_if_exists(paths.best_test_model_fn,
-			paths.best_test_model_backup_fn, true)
-		rename_file_if_exists(paths.best_test_train_info_fn,
-			paths.best_test_train_info_backup_fn, true)
-		create_hard_link(paths.cur_model_fn,
-			paths.best_test_model_fn, true)
-		create_hard_link(paths.cur_train_info_fn,
-			paths.best_test_train_info_fn, true)
-		remove_file_if_exists(paths.best_test_model_backup_fn, true)
-		remove_file_if_exists(paths.best_test_train_info_backup_fn, true)
+		print("New best test score: updating hard links.")
+		rename_file_if_exists(mpaths.best_test_model_fn,
+			mpaths.best_test_model_backup_fn, true)
+		rename_file_if_exists(mpaths.best_test_train_info_fn,
+			mpaths.best_test_train_info_backup_fn, true)
+		create_hard_link(mpaths.cur_model_fn,
+			mpaths.best_test_model_fn, true)
+		create_hard_link(mpaths.cur_train_info_fn,
+			mpaths.best_test_train_info_fn, true)
+		remove_file_if_exists(mpaths.best_test_model_backup_fn, true)
+		remove_file_if_exists(mpaths.best_test_train_info_backup_fn, true)
 
 		print("Saving accuracy info.")
-		rename_file_if_exists(paths.acc_info_fn,
-			paths.acc_info_backup_fn, true)
-		torch.save(paths.acc_info_fn, info.acc)
-		remove_file_if_exists(paths.acc_info_backup_fn, true)
+		rename_file_if_exists(mpaths.acc_info_fn,
+			mpaths.acc_info_backup_fn, true)
+		torch.save(mpaths.acc_info_fn, info.acc)
+		remove_file_if_exists(mpaths.acc_info_backup_fn, true)
 
 		print("Updating test scores.")
 		remove_file_if_exists(mpaths.test_scores_fn, true)
