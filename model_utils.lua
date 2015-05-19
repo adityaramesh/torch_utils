@@ -3,6 +3,15 @@ model_utils = {}
 require "torch"
 require "lfs"
 
+function model_utils.default_options(cmd)
+	cmd:text("Select one of the following options:")
+	cmd:option("-task", "create", "create | resume | replace | evaluate")
+	cmd:option("-model", "test", "The model name.")
+	cmd:option("-model_dir", "models", "The model data directory.")
+	cmd:option("-version", "current", "current | best_train | best_test")
+	cmd:option("-device", 1, "GPU device number.")
+end
+
 local function remove_file_if_exists(file, silent)
 	if not paths.filep(file) then
 		return
@@ -83,16 +92,10 @@ local function rename_backup(backup, new)
 	return true
 end
 
-local function parse_arguments(models_dir)
-	if not opt then
-		local cmd = torch.CmdLine()
-		cmd:text("Select one of the following options:")
-		cmd:option("-task", "create", "create | resume | replace | evaluate")
-		cmd:option("-model", "test", "The model name.")
-		cmd:option("-version", "current", "current | best_train | best_test")
-		cmd:option("-device", 1, "GPU device number.")
-		opt = cmd:parse(arg or {})
-	end
+local function parse_arguments(options_func, model_dir)
+	local cmd = torch.CmdLine()
+	options_func(cmd)
+	local opt = cmd:parse(arg or {})
 
 	print("Using device " .. opt.device .. ".")
 	cutorch.setDevice(opt.device)
@@ -104,9 +107,12 @@ local function parse_arguments(models_dir)
 		error("Invalid model name `" .. opt.model .. "`.")
 	end
 
-	local models_dir = "models"
-	local output_dir = paths.concat(models_dir, opt.model)
+	local model_dir = opt.model_dir
+	if not paths.dirp(model_dir) then
+		make_directory(model_dir)
+	end
 
+	local output_dir = paths.concat(model_dir, opt.model)
 	if opt.task == "create" then
 		if paths.dirp(output_dir) then
 			error("Model `" .. opt.model .. "` already exists.")
@@ -189,7 +195,7 @@ local function deserialize(opt, mpaths, model_info_func, train_info_func)
 			error("Model file `" .. target_model_fn .. "` not found.")
 		end
 		print("Creating new model.")
-		model_info = model_info_func()
+		model_info = model_info_func(opt)
 	end
 
 	if paths.filep(target_train_info_fn) then
@@ -200,7 +206,7 @@ local function deserialize(opt, mpaths, model_info_func, train_info_func)
 			error("Train info file `" .. target_train_info_fn .. "` not found.")
 		end
 		print("Initializing training state.")
-		train_info = train_info_func()
+		train_info = train_info_func(opt)
 	end
 
 	if paths.filep(mpaths.acc_info_fn) then
@@ -215,9 +221,10 @@ local function deserialize(opt, mpaths, model_info_func, train_info_func)
 	end
 
 	return {
-		model = model_info,
-		train = train_info,
-		acc   = acc_info
+		options = opt,
+		model   = model_info,
+		train   = train_info,
+		acc     = acc_info
 	}
 end
 
@@ -299,8 +306,9 @@ function model_utils.save_test_progress(func, epoch, new_score, mpaths, info)
 	end
 end
 
-function model_utils.restore(model_info_func, train_info_func)
-	local output_dir, opt = parse_arguments(models_dir)
+function model_utils.restore(model_info_func, train_info_func, options_func)
+	options_func = options_func or model_utils.default_options
+	local output_dir, opt = parse_arguments(options_func, model_dir)
 
 	-- Define the paths to the output files for serialization.
 	local paths = {
