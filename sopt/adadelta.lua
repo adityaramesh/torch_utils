@@ -16,51 +16,73 @@ function sopt.adadelta(func, x, config, state)
 	if not state.temp then
 		state.temp = torch.Tensor():typeAs(x):resizeAs(x)
 		state.exp_update = torch.Tensor():typeAs(x):resizeAs(x):zero()
-		state.exp_grad_fx = torch.Tensor():typeAs(x):resizeAs(x):zero()
+		state.exp_grad = torch.Tensor():typeAs(x):resizeAs(x):zero()
 	end
 
-	if mom_type == sopt.none then
-		local fx, grad_fx = func(x)
+	local isnan = function(x) return x ~= x end
 
-		state.temp:pow(grad_fx, 2):mul(1 - cur_decay)
-		state.exp_grad_fx:mul(cur_decay):add(state.temp)
+	if mom_type == sopt.none then
+		local loss, grad = func(x)
+
+		state.temp:pow(grad, 2):mul(1 - cur_decay)
+		state.exp_grad:mul(cur_decay):add(state.temp)
 
 		-- Compute the update.
 		state.exp_update:add(eps)
-		state.exp_grad_fx:add(eps)
-		state.temp:cdiv(state.exp_update, state.exp_grad_fx):sqrt():
-			cmul(grad_fx):mul(cur_lr)
+		state.exp_grad:add(eps)
+		state.temp:cdiv(state.exp_update, state.exp_grad):sqrt():
+			cmul(grad):mul(cur_lr)
 		state.exp_update:add(-eps)
-		state.exp_grad_fx:add(-eps)
+		state.exp_grad:add(-eps)
 		x:add(-1, state.temp)
+
+		local descent = -state.temp:dot(grad)
+		local theta = math.acos(descent / (state.temp:norm() * grad:norm()))
+		if isnan(theta) then
+			theta = -1
+		end
+
+		local new_loss, new_grad = func(x, false)
+		local eta_a = (new_loss - loss) / descent
+		local eta_w = math.abs(state.temp:dot(new_grad) / descent)
 
 		-- Update the decaying RMS of the updates.
 		state.temp:pow(2):mul(1 - cur_decay)
 		state.exp_update:mul(cur_decay):add(state.temp)
-		return x, {fx}
+		return x, {loss}, theta, eta_a, eta_w
 	elseif mom_type == sopt.nag then
 		local cur_mom = mom(k)
 
 		-- Evaluate the function at the test point.
 		state.temp:add(x, cur_mom, state.exp_update)
-		local fx, grad_fx = func(state.temp)
+		local loss, grad = func(state.temp)
 
-		state.temp:pow(grad_fx, 2):mul(1 - cur_decay)
-		state.exp_grad_fx:mul(cur_decay):add(state.temp)
+		state.temp:pow(grad, 2):mul(1 - cur_decay)
+		state.exp_grad:mul(cur_decay):add(state.temp)
 
 		-- Compute the update.
 		state.exp_update:add(eps)
-		state.exp_grad_fx:add(eps)
-		state.temp:cdiv(state.exp_update, state.exp_grad_fx):sqrt():
-			cmul(grad_fx):mul(cur_lr)
+		state.exp_grad:add(eps)
+		state.temp:cdiv(state.exp_update, state.exp_grad):sqrt():
+			cmul(grad):mul(cur_lr)
 		state.exp_update:add(-eps)
-		state.exp_grad_fx:add(-eps)
+		state.exp_grad:add(-eps)
 		x:add(-1, state.temp)
+
+		local descent = -state.temp:dot(grad)
+		local theta = math.acos(descent / (state.temp:norm() * grad:norm()))
+		if isnan(theta) then
+			theta = -1
+		end
+
+		local new_loss, new_grad = func(x, false)
+		local eta_a = (new_loss - loss) / descent
+		local eta_w = math.abs(state.temp:dot(new_grad) / descent)
 
 		-- Update the decaying RMS of the updates.
 		state.temp:pow(2):mul(1 - cur_decay)
 		state.exp_update:mul(cur_decay):add(state.temp):add(eps)
-		return x, {fx}
+		return x, {loss}, theta, eta_a, eta_w
 	else
 		error("Invalid momentum type '" .. mom_type .. "'.")
 	end
