@@ -61,11 +61,13 @@ function SGUOptimizer:log_sgu_nag_info(input, target, cur_lr, loss)
 		-- 	          := eta * p_{k + 1}.
 		-- Thus p_{k + 1} = (1 / eta) * s_{k + 1}. So we use p_{k + 1}
 		-- instead of s_{k + 1} to compute the quantities that we log.
-
 		local norm_grad = self.grad_params:norm()
 		local descent = 1 / cur_lr * self.state.temp:dot(self.grad_params)
-		local theta = math.acos(descent / (1 / (cur_lr * cur_lr) *
-			self.state.temp:norm() * norm_grad))
+
+		-- Note: I folded the `1 / cur_lr` from the denominator into the
+		-- numerator to clean things up.
+		local theta = math.acos(cur_lr * descent / (self.state.temp:norm() *
+			norm_grad))
 
 		-- If this happens, then either the update or the gradient has
 		-- a very small magnitude. We report -1 to indicate that the
