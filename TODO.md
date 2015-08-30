@@ -9,9 +9,6 @@
 
 ## Agenda
 
-- Check the math for sgu, rmsprop, and adadelta.
-- Update rmsprop.
-- Add the logging utility from the SVHN repository.
 - Test sgu and rmsprop. Be sure to inspect the information from the logger and
 check that it is sensible.
 - Update adadelta.
