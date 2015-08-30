@@ -1,9 +1,9 @@
-model_utils = {}
+model_io = {}
 
 require "torch"
 require "lfs"
 
-function model_utils.default_options(cmd)
+function model_io.default_options(cmd)
 	cmd:text("Select one of the following options:")
 	cmd:option("-task", "create", "create | resume | replace | evaluate")
 	cmd:option("-model", "test", "The model name.")
@@ -237,7 +237,7 @@ local function write_scores(fn, scores)
 	io.close(file)
 end
 
-function model_utils.save_train_progress(func, epoch, new_score, mpaths, info)
+function model_io.save_train_progress(func, epoch, new_score, mpaths, info)
 	print("Saving current model and training info.")
 	rename_file_if_exists(mpaths.cur_model_fn,
 		mpaths.cur_model_backup_fn, true)
@@ -280,7 +280,7 @@ function model_utils.save_train_progress(func, epoch, new_score, mpaths, info)
 	write_scores(mpaths.train_scores_fn, info.acc.train_scores)
 end
 
-function model_utils.save_test_progress(func, epoch, new_score, mpaths, info)
+function model_io.save_test_progress(func, epoch, new_score, mpaths, info)
 	info.acc.test_scores[epoch] = new_score
 
 	if info.acc.best_test == nil or func(new_score, info.acc.best_test) then
@@ -310,8 +310,8 @@ function model_utils.save_test_progress(func, epoch, new_score, mpaths, info)
 	write_scores(mpaths.test_scores_fn, info.acc.test_scores)
 end
 
-function model_utils.restore(model_info_func, train_info_func, options_func)
-	options_func = options_func or model_utils.default_options
+function model_io.restore(model_info_func, train_info_func, options_func)
+	options_func = options_func or model_io.default_options
 	local output_dir, opt = parse_arguments(options_func, model_dir)
 
 	-- Define the paths to the output files for serialization.

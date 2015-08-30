@@ -31,7 +31,7 @@ files produced by `model_utils.lua` on the fly. It should report the following:
 - Implement adam (+ NAG), adamax (+ other norms, NAG).
 - RMSProp with the expansion/contraction factor modification as described by
 Climin. If this is successful, perhaps try modifying AdaDelta in the same way.
-- AdamDelta (+ NAG), AdamaxDelta (+ other norms, NAG).
+- AdamDelta (+ NAG), "AdamaxDelta" (+ other norms, NAG).
 - AdaSecant, along with various modifications inspired by other approaches.
 - Update documentation.
 
