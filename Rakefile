@@ -12,5 +12,5 @@ end
 
 task :test_optimizer, [:name, :gpu] => model_dir do |t, args|
 	sh "th test/drivers/#{args[:name]}_test.lua -device #{args[:gpu]} " \
-		"-model #{args[:name]}_test"
+		"-model #{args[:name]}_test -task replace"
 end

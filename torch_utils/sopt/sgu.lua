@@ -39,7 +39,7 @@ function SGUOptimizer:log_info(input, target, cur_lr, loss)
 
 	if not self.prev_grad_params then
 		self.prev_grad_params = torch.Tensor():typeAs(self.grad_params):
-			resizeAs(grad_params)
+			resizeAs(self.grad_params)
 	end
 
 	local norm_grad = self.grad_params:norm()
@@ -84,7 +84,7 @@ function SGUOptimizer:log_nag_info(input, target, cur_lr, loss)
 	-- Note that descent := `1 / cur_lr * proj`. Because of cancellation
 	-- with `cur_lr` that occurs in the formulas, we don't actually define
 	-- it this way.
-	local proj = self.state.step:dot(self.prev_grad_params)
+	local proj = self.state.step:dot(self.state.prev_grad_params)
 	-- Note that theta could be NaN. If this happens, then either the update
 	-- or the gradient has very small magnitude, so the angle could not be
 	-- computed in single precision.

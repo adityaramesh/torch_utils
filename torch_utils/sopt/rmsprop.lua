@@ -41,7 +41,7 @@ function RMSPropOptimizer:log_info(input, target, cur_lr, loss)
 
 	if not self.prev_grad_params then
 		self.prev_grad_params = torch.Tensor():typeAs(self.grad_params):
-			resizeAs(grad_params)
+			resizeAs(self.grad_params)
 	end
 
 	local norm_grad = self.grad_params:norm()
@@ -53,7 +53,7 @@ function RMSPropOptimizer:log_info(input, target, cur_lr, loss)
 
 	self.prev_grad_params:copy(self.grad_params)
 	local new_loss = self.grad_func(input, target)
-	local eta_a = (new_loss - loss) / (cur_lr * proj)
+	local eta_a = cur_lr * (new_loss - loss) / proj
 	local eta_w = math.abs(-self.state.temp:dot(self.grad_params) / proj)
 
 	self.logger:log_value("loss", loss)
@@ -79,7 +79,7 @@ function RMSPropOptimizer:log_nag_info(input, target, cur_lr, loss)
 	-- Note that descent := `1 / cur_lr * proj`. Because of cancellation
 	-- with `cur_lr` that occurs in the formulas, we don't actually define
 	-- it this way.
-	local proj = self.state.step:dot(self.prev_grad_params)
+	local proj = self.state.step:dot(self.state.prev_grad_params)
 	-- Note that theta could be NaN. If this happens, then either the update
 	-- or the gradient has very small magnitude, so the angle could not be
 	-- computed in single precision.
@@ -105,6 +105,11 @@ function RMSPropOptimizer:update(input, target)
 	assert(cur_lr > 0 and cur_lr <= 1)
 	assert(cur_decay > 0 and cur_decay < 1)
 
+	-- Initializing the parameters here causes the first update to be
+	-- multiplied by `(1 - cur_decay)`, since the running average of the
+	-- second moment of the gradient will be zero. While it may seem like
+	-- using a severe underestimate may impede convergence, I have actually
+	-- found that the optimizer converges faster.
 	if not self.state.temp then
 		-- Used as a buffer to store intermediate results.
 		self.state.temp = torch.Tensor():typeAs(self.params):
@@ -118,19 +123,9 @@ function RMSPropOptimizer:update(input, target)
 		local loss = self.grad_func(input, target, true)
 
 		-- Update the estimate of the second moment of the gradient.
-		if not self.state.temp then
-			-- At the first iteration, we shouldn't multiply the
-			-- second moment estimate by the decay factor.
-			self.state.grad_mom_2 = self.grad_params:clone():pow(2)
-			self.state.temp = self.grad_mom_2:clone():
-				add(self.state.eps):sqrt()
-		else
-			self.state.temp:pow(self.grad_params, 2)
-			self.state.grad_mom_2:mul(cur_decay):
-				add(1 - cur_decay, self.state.temp)
-			self.state.temp:add(self.state.grad_mom_2, self.state.eps):
-				sqrt()
-		end
+		self.state.temp:pow(self.grad_params, 2)
+		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp)
+		self.state.temp:add(self.state.grad_mom_2, self.eps):sqrt()
 
 		self.params:addcdiv(-cur_lr, self.grad_params, self.state.temp)
 		self:log_info(input, target, cur_lr, loss)
@@ -154,20 +149,9 @@ function RMSPropOptimizer:update(input, target)
 		local loss = self.grad_func(input, target, true)
 
 		-- Update the estimate of the second moment of the gradient.
-		if not self.state.temp then
-			-- At the first iteration, we shouldn't multiply the
-			-- second moment estimate by the decay factor.
-			self.state.grad_mom_2 = self.grad_params:clone():pow(2)
-			self.state.temp = self.grad_mom_2:clone():
-				add(self.state.eps):sqrt()
-		else
-			self.state.temp:pow(self.grad_params, 2)
-			self.state.grad_mom_2:mul(cur_decay):
-				add(1 - cur_decay, self.state.temp)
-			self.state.temp:add(self.state.grad_mom_2, self.state.eps):
-				sqrt()
-		end
-
+		self.state.temp:pow(self.grad_params, 2)
+		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp)
+		self.state.temp:add(self.state.grad_mom_2, self.eps):sqrt()
 		self.state.temp:cdiv(self.grad_params, self.state.temp):mul(-cur_lr)
 
 		-- Update the parameters.

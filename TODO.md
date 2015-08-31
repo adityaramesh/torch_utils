@@ -7,15 +7,14 @@
 
 # TODO
 
-## Agenda
+## Immediate Items
 
 - Test sgu and rmsprop. Be sure to inspect the information from the logger and
 check that it is sensible.
 - Update adadelta.
-- Add tests for updated optimization algorithms on SVHN.
-- Test the following:
-  - "Buggy" RMSProp + NAG vs the new one.
-  - "Buggy" AdaDelta + NAG vs the new one.
+- Test adadelta.
+
+## For Later
 
 - Make a Python utility for iPython notebook that can plot data from the data
 files produced by `model_utils.lua` on the fly. It should report the following:
