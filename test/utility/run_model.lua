@@ -125,7 +125,7 @@ function make_context(info)
 
 	context.optimizer = info.train.opt_method.create(
 		model, context.params, context.grad_params, context.grad_func,
-		info.train.opt_state)--, context.logger)
+		info.train.opt_state, context.logger)
 	context.logger:write_header()
 	return context
 end
