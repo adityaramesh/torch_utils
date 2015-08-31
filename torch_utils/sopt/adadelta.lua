@@ -33,11 +33,65 @@ function AdaDeltaOptimizer.create(model, params, grad_params, grad_func, state, 
 	return self
 end
 
+--
 -- Log function for AdaDelta without NAG.
--- TODO
+--
+function AdaDeltaOptimizer:log_info(input, target, cur_lr, loss)
+	if not self.logger then return end
 
--- Log function for AdaDelta with NAG.
--- TODO
+	if not self.prev_grad_params then
+		self.prev_grad_params = torch.Tensor():typeAs(self.grad_params):
+			resizeAs(self.grad_params)
+	end
+
+	local norm_grad = self.grad_params:norm()
+	local descent = self.state.temp_1:dot(self.grad_params)
+	local theta = math.acos(descent / (self.state.temp_1:norm() * norm_grad))
+
+	self.prev_grad_params:copy(self.grad_params)
+	local new_loss = self.grad_func(input, target)
+	local eta_a = (new_loss - loss) / descent
+	local eta_w = math.abs(self.state.temp_1:dot(self.grad_params) / descent)
+
+	self.logger:log_value("loss", loss)
+	self.logger:log_value("norm_grad", norm_grad)
+	self.logger:log_value("theta", theta)
+	self.logger:log_value("eta_a", eta_a)
+	self.logger:log_value("eta_w", eta_w)
+end
+
+--
+-- Log function for AdaDelta with NAG. Currently the implementation is exactly
+-- the same as the one in `sgu.lua`.
+--
+function AdaDeltaOptimizer:log_nag_info(input, target, cur_lr, loss)
+	if not self.logger then return end
+	assert(self.state.prev_params ~= nil)
+	assert(self.state.prev_grad_params ~= nil)
+
+	-- See comment for analogous function in `sgu.lua` for more information
+	-- regarding the computations performed below.
+
+	local norm_grad = self.state.prev_grad_params:norm()
+	-- Note that descent := `1 / cur_lr * proj`. Because of cancellation
+	-- with `cur_lr` that occurs in the formulas, we don't actually define
+	-- it this way.
+	local proj = self.state.step:dot(self.state.prev_grad_params)
+	-- Note that theta could be NaN. If this happens, then either the update
+	-- or the gradient has very small magnitude, so the angle could not be
+	-- computed in single precision.
+	local theta = math.acos(proj / (self.state.step:norm() * norm_grad))
+
+	local new_loss = self.grad_func(input, target)
+	local eta_a = cur_lr * (new_loss - loss) / proj
+	local eta_w = math.abs(self.state.step:dot(self.grad_params) / proj)
+
+	self.logger:log_value("loss", loss)
+	self.logger:log_value("norm_grad", norm_grad)
+	self.logger:log_value("theta", theta)
+	self.logger:log_value("eta_a", eta_a)
+	self.logger:log_value("eta_w", eta_w)
+end
 
 function AdaDeltaOptimizer:update(input, target)
 	local iter = self.state.iter
@@ -50,27 +104,48 @@ function AdaDeltaOptimizer:update(input, target)
 
 	-- Initializing the parameters here causes the first update to be
 	-- multiplied by `(1 - cur_decay)`, since the running average of the
-	-- second moment of the gradient will be zero. While it may seem like
-	-- using a severe underestimate may impede convergence, I have actually
-	-- found that the optimizer converges faster.
+	-- second moment estimates will be zero. While it may seem like using a
+	-- severe underestimate may impede convergence, I have actually found
+	-- that the optimizer converges faster this way.
 	if not self.state.temp then
-		-- Used as a buffer to store intermediate results.
-		self.state.temp = torch.Tensor():typeAs(self.params):
+		-- Used as buffers to store intermediate values.
+		self.state.temp_1 = torch.Tensor():typeAs(self.params):
+			resizeAs(self.params):zero()
+		self.state.temp_2 = torch.Tensor():typeAs(self.params):
 			resizeAs(self.params):zero()
 		-- Estimate of the second moment of the gradient.
 		self.state.grad_mom_2 = torch.Tensor():typeAs(self.params):
+			resizeAs(self.params):zero()
+		-- Estimate of the second moment of the update.
+		self.state.update_mom_2 = torch.Tensor():typeAs(self.params):
 			resizeAs(self.params):zero()
 	end
 
 	if self.mom_type == sopt.none then
 		local loss = self.grad_func(input, target, true)
 
-		-- Update the estimate of the second moment of the gradient.
-		self.state.temp:pow(self.grad_params, 2)
-		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp)
-		self.state.temp:add(self.state.grad_mom_2, self.eps):sqrt()
+		-- Note: we could make the implementation below faster by only
+		-- only one temporary buffer instead of two, but this would
+		-- involve adding and subtracting epsilon to the same buffers.
+		-- Using floating-point arithmetic, the net change will not
+		-- always be zero. I suspect that this may have a detrimental
+		-- effect close to convergence (when the other terms in the
+		-- square root will also be small), so this optimization is not
+		-- used.
 
-		self.params:addcdiv(-cur_lr, self.grad_params, self.state.temp)
+		self.state.temp_2:pow(self.grad_params, 2)
+		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp_2)
+
+		self.state.temp_2:add(self.state.grad_mom_2, self.eps)
+		self.state.temp_1:add(self.state.update_mom_2, self.eps):
+			cdiv(self.state.temp_2):sqrt():cmul(self.grad_params):
+			mul(-cur_lr)
+		self.params:add(self.state.temp_1)
+
+		-- We use temp_2 instead of temp_1 here, because the logger
+		-- needs the value of the update.
+		self.state.temp_2:pow(self.state.temp_1, 2)
+		self.state.update_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp_2)
 		self:log_info(input, target, cur_lr, loss)
 	elseif self.mom_type == sopt.nag then
 		if not self.state.step then
@@ -91,15 +166,19 @@ function AdaDeltaOptimizer:update(input, target)
 		self.params:add(self.state.step)
 		local loss = self.grad_func(input, target, true)
 
-		-- Update the estimate of the second moment of the gradient.
-		self.state.temp:pow(self.grad_params, 2)
-		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp)
-		self.state.temp:add(self.state.grad_mom_2, self.eps):sqrt()
-		self.state.temp:cdiv(self.grad_params, self.state.temp):mul(-cur_lr)
+		self.state.temp_2:pow(self.grad_params, 2)
+		self.state.grad_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp_2)
 
-		-- Update the parameters.
-		self.state.step:add(self.state.temp)
-		self.params:add(self.state.temp)
+		self.state.temp_2:add(self.state.grad_mom_2, self.eps)
+		self.state.temp_1:add(self.state.update_mom_2, self.eps):
+			cdiv(self.state.temp_2):sqrt():cmul(self.grad_params):
+			mul(-cur_lr)
+
+		self.state.step:add(self.state.temp_1)
+		self.params:add(self.state.temp_1)
+
+		self.state.temp_1:pow(self.state.step, 2)
+		self.state.update_mom_2:mul(cur_decay):add(1 - cur_decay, self.state.temp_1)
 
 		if self.logger then
 			self:log_nag_info(input, target, cur_lr, loss)
@@ -109,95 +188,5 @@ function AdaDeltaOptimizer:update(input, target)
 		end
 	else
 		error("Unsupported momentum type.")
-	end
-end
-
-function sopt.adadelta(func, x, config, state)
-	local config   = config or {}
-	local state    = state or config
-	local eps      = config.epsilon or 1e-10
-	local lr       = config.learning_rate or sopt.constant(1)
-	local decay    = config.decay or sopt.constant(0.95)
-	local mom      = config.momentum or sopt.sutskever_blend(0.999)
-	local mom_type = config.momentum_type or sopt.none
-	state.iter = state.iter or 0
-
-	local k = state.iter
-	local cur_lr = lr(k)
-	local cur_decay = decay(k)
-	state.iter = state.iter + 1
-
-	if not state.temp then
-		state.temp = torch.Tensor():typeAs(x):resizeAs(x)
-		state.exp_update = torch.Tensor():typeAs(x):resizeAs(x):zero()
-		state.exp_grad = torch.Tensor():typeAs(x):resizeAs(x):zero()
-	end
-
-	local isnan = function(x) return x ~= x end
-
-	if mom_type == sopt.none then
-		local loss, grad = func(x)
-
-		state.temp:pow(grad, 2):mul(1 - cur_decay)
-		state.exp_grad:mul(cur_decay):add(state.temp)
-
-		-- Compute the update.
-		state.exp_update:add(eps)
-		state.exp_grad:add(eps)
-		state.temp:cdiv(state.exp_update, state.exp_grad):sqrt():
-			cmul(grad):mul(cur_lr)
-		state.exp_update:add(-eps)
-		state.exp_grad:add(-eps)
-		x:add(-1, state.temp)
-
-		local descent = -state.temp:dot(grad)
-		local theta = math.acos(descent / (state.temp:norm() * grad:norm()))
-		if isnan(theta) then
-			theta = -1
-		end
-
-		local new_loss, new_grad = func(x, false)
-		local eta_a = (new_loss - loss) / descent
-		local eta_w = math.abs(state.temp:dot(new_grad) / descent)
-
-		-- Update the decaying RMS of the updates.
-		state.temp:pow(2):mul(1 - cur_decay)
-		state.exp_update:mul(cur_decay):add(state.temp)
-		return x, {loss}, theta, eta_a, eta_w
-	elseif mom_type == sopt.nag then
-		local cur_mom = mom(k)
-
-		-- Evaluate the function at the test point.
-		state.temp:add(x, cur_mom, state.exp_update)
-		local loss, grad = func(state.temp)
-
-		state.temp:pow(grad, 2):mul(1 - cur_decay)
-		state.exp_grad:mul(cur_decay):add(state.temp)
-
-		-- Compute the update.
-		state.exp_update:add(eps)
-		state.exp_grad:add(eps)
-		state.temp:cdiv(state.exp_update, state.exp_grad):sqrt():
-			cmul(grad):mul(cur_lr)
-		state.exp_update:add(-eps)
-		state.exp_grad:add(-eps)
-		x:add(-1, state.temp)
-
-		local descent = -state.temp:dot(grad)
-		local theta = math.acos(descent / (state.temp:norm() * grad:norm()))
-		if isnan(theta) then
-			theta = -1
-		end
-
-		local new_loss, new_grad = func(x, false)
-		local eta_a = (new_loss - loss) / descent
-		local eta_w = math.abs(state.temp:dot(new_grad) / descent)
-
-		-- Update the decaying RMS of the updates.
-		state.temp:pow(2):mul(1 - cur_decay)
-		state.exp_update:mul(cur_decay):add(state.temp):add(eps)
-		return x, {loss}, theta, eta_a, eta_w
-	else
-		error("Invalid momentum type '" .. mom_type .. "'.")
 	end
 end

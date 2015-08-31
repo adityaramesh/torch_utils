@@ -9,9 +9,6 @@
 
 ## Immediate Items
 
-- Test sgu and rmsprop. Be sure to inspect the information from the logger and
-check that it is sensible.
-- Update adadelta.
 - Test adadelta.
 
 ## For Later
@@ -32,6 +29,9 @@ files produced by `model_utils.lua` on the fly. It should report the following:
 Climin. If this is successful, perhaps try modifying AdaDelta in the same way.
 - AdamDelta (+ NAG), "AdamaxDelta" (+ other norms, NAG).
 - AdaSecant, along with various modifications inspired by other approaches.
+  - In particular, Durk Kingma and Tom Schaul were working on integrating Adam
+  with AdaSecant. But they seem to have lost interest on that now. If this turns
+  out to work well, then contact them to let them know about it.
 - Update documentation.
 
 ## Ideas

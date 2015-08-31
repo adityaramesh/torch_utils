@@ -107,9 +107,9 @@ function RMSPropOptimizer:update(input, target)
 
 	-- Initializing the parameters here causes the first update to be
 	-- multiplied by `(1 - cur_decay)`, since the running average of the
-	-- second moment of the gradient will be zero. While it may seem like
-	-- using a severe underestimate may impede convergence, I have actually
-	-- found that the optimizer converges faster.
+	-- second moment estimates will be zero. While it may seem like using a
+	-- severe underestimate may impede convergence, I have actually found
+	-- that the optimizer converges faster this way.
 	if not self.state.temp then
 		-- Used as a buffer to store intermediate results.
 		self.state.temp = torch.Tensor():typeAs(self.params):
