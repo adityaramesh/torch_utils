@@ -316,6 +316,8 @@ function model_io.restore(model_info_func, train_info_func, options_func)
 
 	-- Define the paths to the output files for serialization.
 	local paths = {
+		output_dir = output_dir,
+
 		cur_model_fn = paths.concat(output_dir,
 			"cur_model.t7"),
 		best_train_model_fn = paths.concat(output_dir,
