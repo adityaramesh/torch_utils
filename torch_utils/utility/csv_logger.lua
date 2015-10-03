@@ -1,4 +1,4 @@
-require 'torch'
+require "torch"
 
 CSVLogger = {}
 CSVLogger.__index = CSVLogger

@@ -5,11 +5,11 @@ require "lfs"
 
 function model_io.default_options(cmd)
 	cmd:text("Select one of the following options:")
-	cmd:option("-task", "create", "create | resume | replace | evaluate")
-	cmd:option("-model", "test", "The model name.")
-	cmd:option("-model_dir", "models", "The model data directory.")
-	cmd:option("-version", "current", "current | best_train | best_test")
-	cmd:option("-device", 1, "GPU device number.")
+	cmd:option("-task",      "create",  "create | resume | replace | evaluate")
+	cmd:option("-model",     "test",    "The model name.")
+	cmd:option("-model_dir", "models",  "The model data directory.")
+	cmd:option("-version",   "current", "current | best_train | best_test")
+	cmd:option("-device",    1,         "GPU device number.")
 end
 
 local function remove_file_if_exists(file, silent)
@@ -359,3 +359,5 @@ function model_io.restore(model_info_func, train_info_func, options_func)
 	local do_test = true
 	return do_train, do_test, paths, info
 end
+
+return model_io
